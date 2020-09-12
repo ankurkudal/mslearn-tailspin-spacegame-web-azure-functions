@@ -111,14 +111,3 @@ stages:
                             "slotSetting": false
                           } 
                         ]
-                    azureSubscription: "Resource Manager - Tailspin - Space Game"
-                    resourceGroupName: $(ResourceGroupName)
-                  task: AzureAppServiceSettings@1
-        variables: 
-          - 
-            group: Release
-    stage: Deploy
-trigger: 
-  - "*"
-variables: 
-  buildConfiguration: Release
