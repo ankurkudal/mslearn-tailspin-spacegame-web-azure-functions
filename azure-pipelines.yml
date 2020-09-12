@@ -1,4 +1,9 @@
---- 
+trigger:
+- '*'
+
+variables:
+  buildConfiguration: 'Release'
+   
 stages: 
   - 
     displayName: "Build the web application"
