@@ -1,114 +1,119 @@
-trigger:
-- '*'
-
-variables:
-  buildConfiguration: 'Release'
-
-stages:
-- stage: 'Build'
-  displayName: 'Build the web application'
-  jobs: 
-  - job: 'Build'
-    displayName: 'Build job'
-    pool:
-      vmImage: 'ubuntu-18.04'
-      demands:
-      - npm
-
-    variables:
-      wwwrootDir: 'Tailspin.SpaceGame.Web/wwwroot'
-      dotnetSdkVersion: '3.1.300'
-
-    steps:
-    - task: UseDotNet@2
-      displayName: 'Use .NET Core SDK $(dotnetSdkVersion)'
-      inputs:
-        version: '$(dotnetSdkVersion)'
-
-    - task: Npm@1
-      displayName: 'Run npm install'
-      inputs:
-        verbose: false
-
-    - script: './node_modules/.bin/node-sass $(wwwrootDir) --output $(wwwrootDir)'
-      displayName: 'Compile Sass assets'
-
-    - task: gulp@1
-      displayName: 'Run gulp tasks'
-
-    - script: 'echo "$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)" > buildinfo.txt'
-      displayName: 'Write build info'
-      workingDirectory: $(wwwrootDir)
-
-    - task: DotNetCoreCLI@2
-      displayName: 'Restore project dependencies'
-      inputs:
-        command: 'restore'
-        projects: '**/*.csproj'
-
-    - task: DotNetCoreCLI@2
-      displayName: 'Build the project - $(buildConfiguration)'
-      inputs:
-        command: 'build'
-        arguments: '--no-restore --configuration $(buildConfiguration)'
-        projects: '**/*.csproj'
-
-    - task: DotNetCoreCLI@2
-      displayName: 'Publish the project - $(buildConfiguration)'
-      inputs:
-        command: 'publish'
-        projects: '**/*.csproj'
-        publishWebProjects: false
-        arguments: '--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)'
-        zipAfterPublish: true
-
-    - publish: '$(Build.ArtifactStagingDirectory)'
-      artifact: drop
-
-- stage: 'Deploy'
-  displayName: 'Deploy the web application'
-  dependsOn: Build
-  jobs:
-  - deployment: Deploy
-    pool:
-      vmImage: 'ubuntu-18.04'
-    environment: spike
-    variables:
-    - group: Release
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - download: current
+--- 
+stages: 
+  - 
+    displayName: "Build the web application"
+    jobs: 
+      - 
+        displayName: "Build job"
+        job: Build
+        pool: 
+          demands: 
+            - npm
+          vmImage: ubuntu-18.04
+        steps: 
+          - 
+            displayName: "Use .NET Core SDK $(dotnetSdkVersion)"
+            inputs: 
+              version: $(dotnetSdkVersion)
+            task: UseDotNet@2
+          - 
+            displayName: "Run npm install"
+            inputs: 
+              verbose: false
+            task: Npm@1
+          - 
+            displayName: "Compile Sass assets"
+            script: "./node_modules/.bin/node-sass $(wwwrootDir) --output $(wwwrootDir)"
+          - 
+            displayName: "Run gulp tasks"
+            task: gulp@1
+          - 
+            displayName: "Write build info"
+            script: "echo \"$(Build.DefinitionName), $(Build.BuildId), $(Build.BuildNumber)\" > buildinfo.txt"
+            workingDirectory: $(wwwrootDir)
+          - 
+            displayName: "Restore project dependencies"
+            inputs: 
+              command: restore
+              projects: "**/*.csproj"
+            task: DotNetCoreCLI@2
+          - 
+            displayName: "Build the project - $(buildConfiguration)"
+            inputs: 
+              arguments: "--no-restore --configuration $(buildConfiguration)"
+              command: build
+              projects: "**/*.csproj"
+            task: DotNetCoreCLI@2
+          - 
+            displayName: "Publish the project - $(buildConfiguration)"
+            inputs: 
+              arguments: "--no-build --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildConfiguration)"
+              command: publish
+              projects: "**/*.csproj"
+              publishWebProjects: false
+              zipAfterPublish: true
+            task: DotNetCoreCLI@2
+          - 
             artifact: drop
-          - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
-            inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
-              appName: '$(WebAppName)'
-              appType: webAppLinux
-              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/Tailspin.SpaceGame.Web.zip'
-
-          - task: AzureFunctionApp@1
-            displayName: 'Azure Function Deploy: leaderboard'
-            inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
-              appType: functionAppLinux
-              appName: '$(LeaderboardAppName)'
-              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/Tailspin.SpaceGame.LeaderboardFunction.zip'
-              runtimeStack: DOCKER|microsoft/azure-functions-dotnet-core3.0:3.0
-              startUpCommand: 'func azure functionapp publish $(functionAppName) --no-bundler'
-          - task: AzureAppServiceSettings@1
-            displayName: 'Update web app settings'
-            inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
-              appName: $(WebAppName)
-              resourceGroupName: $(ResourceGroupName)
-              appSettings: |
-              [
-                {
-                  "name": "AppSettings:LeaderboardFunctionUrl",
-                  "value": "http://$(LeaderboardAppName).azurewebsites.net/api/LeaderboardFunction",
-                  "slotSetting": false
-                } 
-              ]
+            publish: $(Build.ArtifactStagingDirectory)
+        variables: 
+          dotnetSdkVersion: "3.1.300"
+          wwwrootDir: Tailspin.SpaceGame.Web/wwwroot
+    stage: Build
+  - 
+    dependsOn: Build
+    displayName: "Deploy the web application"
+    jobs: 
+      - 
+        deployment: Deploy
+        environment: spike
+        pool: 
+          vmImage: ubuntu-18.04
+        strategy: 
+          runOnce: 
+            deploy: 
+              steps: 
+                - 
+                  artifact: drop
+                  download: current
+                - 
+                  displayName: "Azure App Service Deploy: website"
+                  inputs: 
+                    appName: $(WebAppName)
+                    appType: webAppLinux
+                    azureSubscription: "Resource Manager - Tailspin - Space Game"
+                    package: $(Pipeline.Workspace)/drop/$(buildConfiguration)/Tailspin.SpaceGame.Web.zip
+                  task: AzureWebApp@1
+                - 
+                  displayName: "Azure Function Deploy: leaderboard"
+                  inputs: 
+                    appName: $(LeaderboardAppName)
+                    appType: functionAppLinux
+                    azureSubscription: "Resource Manager - Tailspin - Space Game"
+                    package: $(Pipeline.Workspace)/drop/$(buildConfiguration)/Tailspin.SpaceGame.LeaderboardFunction.zip
+                    runtimeStack: "DOCKER|microsoft/azure-functions-dotnet-core3.0:3.0"
+                    startUpCommand: "func azure functionapp publish $(functionAppName) --no-bundler"
+                  task: AzureFunctionApp@1
+                - 
+                  displayName: "Update web app settings"
+                  inputs: 
+                    appName: $(WebAppName)
+                    appSettings: |-
+                        [
+                          {
+                            "name": "AppSettings:LeaderboardFunctionUrl",
+                            "value": "http://$(LeaderboardAppName).azurewebsites.net/api/LeaderboardFunction",
+                            "slotSetting": false
+                          } 
+                        ]
+                    azureSubscription: "Resource Manager - Tailspin - Space Game"
+                    resourceGroupName: $(ResourceGroupName)
+                  task: AzureAppServiceSettings@1
+        variables: 
+          - 
+            group: Release
+    stage: Deploy
+trigger: 
+  - "*"
+variables: 
+  buildConfiguration: Release
